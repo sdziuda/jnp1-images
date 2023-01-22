@@ -1,0 +1,4 @@
+#ifndef FUNCTIONAL_H
+#define JNP1_IMAGES_FUNCTIONAL_H
+
+#endif FUNCTIONAL_H
