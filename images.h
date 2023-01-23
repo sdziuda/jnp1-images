@@ -5,7 +5,6 @@
 #include "color.h"
 #include <functional>
 #include <cmath>
-#include <iostream>
 
 using Fraction = double;
 
