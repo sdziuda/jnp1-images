@@ -3,6 +3,7 @@
 #include "bmp.h"
 #include "color.h"
 #include "coordinate.h"
+#include "fib_test.h"
 #include <cassert>
 #include <cstdint>
 
@@ -51,6 +52,10 @@ main()
                width,
                height,
                vs);
+    create_BMP("vertical_stripe_0.bmp",
+               width,
+               height,
+               vertical_stripe(0, Colors::Vermilion, Colors::blue));
     create_BMP("cond.bmp",
                width,
                height,
@@ -78,4 +83,6 @@ main()
     const auto f2 = [](auto p) {auto b = p; return b;};
     assert(lift(h1, f1, f2)(42) == 42 * 42);
     assert(lift(h2, f1, f2)(42) == 42 + 42);
+
+    Fibonacci::test();
 }

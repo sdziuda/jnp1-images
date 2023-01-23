@@ -3,6 +3,7 @@
 
 #include "coordinate.h"
 #include "color.h"
+#include "functional.h"
 #include <functional>
 #include <cmath>
 
@@ -41,16 +42,16 @@ Base_image<T> translate(Base_image<T> image, const Vector& v) {
 template<typename T>
 Base_image<T> scale(Base_image<T> image, double s) {
     return [=](const Point& p) {
-        double result_rho = p.is_polar ? p.first / s : to_polar(p).first / s;
-        double result_phi = p.is_polar ? p.second : to_polar(p).second;
-        return image(from_polar(Point(result_rho, result_phi, true)));
+        return image(Point(p.first / s, p.second / s, p.is_polar));
     };
 }
 
 template<typename T>
 Base_image<T> circle(Point q, double r, T inner, T outer) {
     return [=](const Point& p) {
-        return distance(p, q) <= r ? inner : outer;
+        auto p1 = p.is_polar ? from_polar(p) : p;
+        auto q1 = q.is_polar ? from_polar(q) : q;
+        return distance(p1, q1) <= r ? inner : outer;
     };
 }
 
@@ -65,22 +66,25 @@ Base_image<T> checker(double d, T this_way, T that_way) {
 template<typename T>
 Base_image<T> polar_checker(double d, int n, T this_way, T that_way) {
     return [=](const Point& p) {
-        auto p1 = Point(to_polar(p).second / (2 * M_PI) * n * d, distance(p));
-        return checker(d, this_way, that_way)(p1);
+        auto p1 = p.is_polar ? Point(p.second / (2 * M_PI) * n * d, distance(from_polar(p))) :
+                                Point(to_polar(p).second / (2 * M_PI) * n * d, distance(p));
+        return compose(checker(d, this_way, that_way))(p1);
     };
 }
 
 template<typename T>
 Base_image<T> rings(Point q, double d, T this_way, T that_way) {
     return [=](const Point& p) {
-        return std::fmod(std::abs(distance(p, q)), 2 * d) < d ? this_way : that_way;
+        auto p1 = p.is_polar ? from_polar(p) : p;
+        auto q1 = q.is_polar ? from_polar(q) : q;
+        return std::fmod(std::abs(distance(p1, q1)), 2 * d) < d ? this_way : that_way;
     };
 }
 
 template<typename T>
 Base_image<T> vertical_stripe(double d, T this_way, T that_way) {
     return [=](const Point& p) {
-        return std::abs(p.first) <= (d / 2) ? this_way : that_way;
+        return std::abs(p.first) < (d / 2) ? this_way : that_way;
     };
 }
 
