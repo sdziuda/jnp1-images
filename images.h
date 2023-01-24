@@ -6,6 +6,7 @@
 #include "functional.h"
 #include <functional>
 #include <cmath>
+#include <iostream>
 
 using Fraction = double;
 
@@ -18,96 +19,143 @@ using Image = Base_image<Color>;
 
 using Blend = Base_image<Fraction>;
 
+namespace Detail {
+    inline auto make_polar(const Point& p) {
+        return p.is_polar ? p : to_polar(p);
+    }
+
+    inline auto make_cartesian(const Point& p) {
+        return p.is_polar ? from_polar(p) : p;
+    }
+
+    inline auto cond(Region r, auto this_way, auto that_way) {
+        return [=](const Point p) {
+            return r(p) ? this_way(p) : that_way(p);
+        };
+    }
+
+    inline auto mod(double x, double y) {
+        return std::fmod(x, y);
+    }
+
+    inline auto abs(double x) {
+        return std::abs(x);
+    }
+
+    inline auto abs_first(Point p) {
+        return std::abs(p.first);
+    }
+}
+
 template<typename T>
-Base_image<T> constant(const T& t) {
-    return [=](const Point&) { return t; };
+Base_image<T> constant(T t) {
+    return [=](const Point) {return t;};
 }
 
 template<typename T>
 Base_image<T> rotate(Base_image<T> image, double phi) {
-    return [=](const Point& p) {
-        double result_rho = p.is_polar ? p.first : to_polar(p).first;
-        double result_phi = p.is_polar ? p.second - phi : to_polar(p).second - phi;
-        return image(from_polar(Point(result_rho, result_phi, true)));
+    auto rot = [](const Point& p, double phi) {
+        return Point(Detail::make_polar(p).first, Detail::make_polar(p).second - phi, true);
     };
+    auto rot_phi = std::bind(rot, std::placeholders::_1, phi);
+
+    return compose(rot_phi, from_polar, image);
 }
 
 template<typename T>
 Base_image<T> translate(Base_image<T> image, const Vector& v) {
-    return [=](const Point& p) {
-        return image(Point(p.first - v.first, p.second - v.second, p.is_polar));
+    auto move = [](const Point& p, const Vector& v) {
+        return Point(Detail::make_cartesian(p).first - v.first,
+                     Detail::make_cartesian(p).second - v.second);
     };
+    auto move_v = std::bind(move, std::placeholders::_1, v);
+
+    return compose(move_v, image);
 }
 
 template<typename T>
 Base_image<T> scale(Base_image<T> image, double s) {
-    return [=](const Point& p) {
-        return image(Point(p.first / s, p.second / s, p.is_polar));
+    auto scale = [](const Point& p, double s) {
+        return Point(p.first / s, p.is_polar ? p.second : p.second / s, p.is_polar);
     };
+    auto scale_s = std::bind(scale, std::placeholders::_1, s);
+
+    return compose(scale_s, image);
 }
 
 template<typename T>
 Base_image<T> circle(Point q, double r, T inner, T outer) {
-    return [=](const Point& p) {
-        auto p1 = p.is_polar ? from_polar(p) : p;
-        auto q1 = q.is_polar ? from_polar(q) : q;
-        return distance(p1, q1) <= r ? inner : outer;
-    };
+    auto cart_p = std::bind(Detail::make_cartesian, std::placeholders::_1);
+    auto dist_q = std::bind(distance, cart_p, Detail::make_cartesian(q));
+    auto less_r = lift(std::less_equal<>(), dist_q, constant(r));
+
+    return Detail::cond(less_r, constant(inner), constant(outer));
 }
 
 template<typename T>
 Base_image<T> checker(double d, T this_way, T that_way) {
-    return [=](const Point& p) {
+    auto checker = [](const Point p, double d) {
         return (static_cast<int>(std::floor(p.first / d)) +
-                static_cast<int>(std::floor(p.second / d))) % 2 == 0 ? this_way : that_way;
+                static_cast<int>(std::floor(p.second / d))) % 2;
     };
+    auto checker_d = std::bind(checker, std::placeholders::_1, d);
+    auto equal_0 = lift(std::equal_to<>(), checker_d, constant(0));
+
+    return Detail::cond(equal_0, constant(this_way), constant(that_way));
 }
 
 template<typename T>
 Base_image<T> polar_checker(double d, int n, T this_way, T that_way) {
-    return [=](const Point& p) {
-        auto p1 = p.is_polar ? Point(p.second / (2 * M_PI) * n * d, distance(from_polar(p))) :
-                                Point(to_polar(p).second / (2 * M_PI) * n * d, distance(p));
-        return compose(checker(d, this_way, that_way))(p1);
+    auto dist_p = [](const Point& p) {
+        return distance(Detail::make_cartesian(p));
     };
+    auto change_first = [](const Point p, double d, int n) {
+        return Detail::make_polar(p).second / (2 * M_PI) * n * d;
+    };
+    auto change_checker_d_n = std::bind(change_first, std::placeholders::_1, d, n);
+    auto make_point = [](double x, double y) {
+        return Point(x, y);
+    };
+    auto change_p = lift(make_point, change_checker_d_n, dist_p);
+
+    return compose(change_p, checker(d, this_way, that_way));
 }
 
 template<typename T>
 Base_image<T> rings(Point q, double d, T this_way, T that_way) {
-    return [=](const Point& p) {
-        auto p1 = p.is_polar ? from_polar(p) : p;
-        auto q1 = q.is_polar ? from_polar(q) : q;
-        return std::fmod(std::abs(distance(p1, q1)), 2 * d) < d ? this_way : that_way;
-    };
+    auto cart_p = std::bind(Detail::make_cartesian, std::placeholders::_1);
+    auto dist_q = std::bind(distance, cart_p, Detail::make_cartesian(q));
+    auto mod_d = std::bind(Detail::mod, std::placeholders::_1, 2 * d);
+    auto less_d = lift(std::less_equal<>(), compose(dist_q, Detail::abs, mod_d), constant(d));
+
+    return Detail::cond(less_d, constant(this_way), constant(that_way));
 }
 
 template<typename T>
 Base_image<T> vertical_stripe(double d, T this_way, T that_way) {
-    return [=](const Point& p) {
-        return std::abs(p.first) < (d / 2) ? this_way : that_way;
-    };
+    auto less_d = lift(std::less<>(), Detail::abs_first, constant(d / 2));
+
+    return Detail::cond(less_d, constant(this_way), constant(that_way));
 }
 
 inline Image cond(Region region, Image this_way, Image that_way) {
-    return [=](const Point& p) {
-        return region(p) ? this_way(p) : that_way(p);
-    };
+    return Detail::cond(region, this_way, that_way);
 }
 
 inline Image lerp(Blend blend, Image this_way, Image that_way) {
-    return [=](const Point& p) {
+    return [=](const Point p) {
         return this_way(p).weighted_mean(that_way(p), blend(p));
     };
 }
 
 inline Image darken(Image image, Blend blend) {
-    return [=](const Point& p) {
+    return [=](const Point p) {
         return image(p).weighted_mean(Colors::black, blend(p));
     };
 }
 
 inline Image lighten(Image image, Blend blend) {
-    return [=](const Point& p) {
+    return [=](const Point p) {
         return image(p).weighted_mean(Colors::white, blend(p));
     };
 }

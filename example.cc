@@ -24,6 +24,10 @@ main()
                width,
                height,
                rotate(vs, M_PI / 4.));
+    create_BMP("rotate_circle.bmp",
+               width,
+               height,
+               rotate(circle(Point(50., 100.), 10., Colors::Vermilion, Colors::blue), M_PI / 2.));
     create_BMP("translate.bmp",
                width,
                height,
