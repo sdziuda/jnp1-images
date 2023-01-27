@@ -109,17 +109,16 @@ Base_image<T> checker(double d, T this_way, T that_way) {
 
 template<typename T>
 Base_image<T> polar_checker(double d, int n, T this_way, T that_way) {
-    auto dist_p = [](const Point& p) {
-        return distance(Detail::make_cartesian(p));
-    };
-    auto change_first = [](const Point p, double d, int n) {
+    auto first = [](const Point p) {return p.first;};
+    auto change_first = compose(Detail::make_polar, first);
+    auto change_second = [](const Point p, double d, int n) {
         return Detail::make_polar(p).second / (2 * M_PI) * n * d;
     };
-    auto change_checker_d_n = std::bind(change_first, std::placeholders::_1, d, n);
+    auto change_second_d_n = std::bind(change_second, std::placeholders::_1, d, n);
     auto make_point = [](double x, double y) {
         return Point(x, y);
     };
-    auto change_p = lift(make_point, change_checker_d_n, dist_p);
+    auto change_p = lift(make_point, change_first, change_second_d_n);
 
     return compose(change_p, checker(d, this_way, that_way));
 }
