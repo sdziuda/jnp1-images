@@ -6,7 +6,6 @@
 #include "functional.h"
 #include <functional>
 #include <cmath>
-#include <iostream>
 
 using Fraction = double;
 
