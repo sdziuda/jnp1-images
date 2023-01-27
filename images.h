@@ -20,11 +20,11 @@ using Image = Base_image<Color>;
 using Blend = Base_image<Fraction>;
 
 namespace Detail {
-    inline auto make_polar(const Point& p) {
+    inline auto make_polar(const Point p) {
         return p.is_polar ? p : to_polar(p);
     }
 
-    inline auto make_cartesian(const Point& p) {
+    inline auto make_cartesian(const Point p) {
         return p.is_polar ? from_polar(p) : p;
     }
 
@@ -56,7 +56,7 @@ Base_image<T> constant(T t) {
 
 template<typename T>
 Base_image<T> rotate(Base_image<T> image, double phi) {
-    auto rot = [](const Point& p, double phi) {
+    auto rot = [](const Point p, double phi) {
         return Point(Detail::make_polar(p).first, Detail::make_polar(p).second - phi, true);
     };
     auto rot_phi = std::bind(rot, std::placeholders::_1, phi);
@@ -65,8 +65,8 @@ Base_image<T> rotate(Base_image<T> image, double phi) {
 }
 
 template<typename T>
-Base_image<T> translate(Base_image<T> image, const Vector& v) {
-    auto move = [](const Point& p, const Vector& v) {
+Base_image<T> translate(Base_image<T> image, Vector v) {
+    auto move = [](const Point p, Vector v) {
         return Point(Detail::make_cartesian(p).first - v.first,
                      Detail::make_cartesian(p).second - v.second);
     };
@@ -77,7 +77,7 @@ Base_image<T> translate(Base_image<T> image, const Vector& v) {
 
 template<typename T>
 Base_image<T> scale(Base_image<T> image, double s) {
-    auto scale = [](const Point& p, double s) {
+    auto scale = [](const Point p, double s) {
         return Point(p.first / s, p.second / s);
     };
     auto scale_s = std::bind(scale, std::placeholders::_1, s);
