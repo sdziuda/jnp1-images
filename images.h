@@ -34,16 +34,18 @@ namespace Detail {
         };
     }
 
+    /**
+     * Wrapper for std::fmod that can be used in compose and lift.
+     */
     inline auto mod(double x, double y) {
         return std::fmod(x, y);
     }
 
+    /**
+     * Wrapper for std::abs that can be used in compose and lift.
+     */
     inline auto abs(double x) {
         return std::abs(x);
-    }
-
-    inline auto abs_first(Point p) {
-        return std::abs(p.first);
     }
 }
 
@@ -59,7 +61,7 @@ Base_image<T> rotate(Base_image<T> image, double phi) {
     };
     auto rot_phi = std::bind(rot, std::placeholders::_1, phi);
 
-    return compose(rot_phi, from_polar, image);
+    return compose(rot_phi, Detail::make_cartesian, image);
 }
 
 template<typename T>
@@ -76,11 +78,11 @@ Base_image<T> translate(Base_image<T> image, const Vector& v) {
 template<typename T>
 Base_image<T> scale(Base_image<T> image, double s) {
     auto scale = [](const Point& p, double s) {
-        return Point(p.first / s, p.is_polar ? p.second : p.second / s, p.is_polar);
+        return Point(p.first / s, p.second / s);
     };
     auto scale_s = std::bind(scale, std::placeholders::_1, s);
 
-    return compose(scale_s, image);
+    return compose(Detail::make_cartesian, scale_s, image);
 }
 
 template<typename T>
@@ -98,7 +100,8 @@ Base_image<T> checker(double d, T this_way, T that_way) {
         return (static_cast<int>(std::floor(p.first / d)) +
                 static_cast<int>(std::floor(p.second / d))) % 2;
     };
-    auto checker_d = std::bind(checker, std::placeholders::_1, d);
+    auto cart_p = std::bind(Detail::make_cartesian, std::placeholders::_1);
+    auto checker_d = std::bind(checker, cart_p, d);
     auto equal_0 = lift(std::equal_to<>(), checker_d, constant(0));
 
     return Detail::cond(equal_0, constant(this_way), constant(that_way));
@@ -133,7 +136,10 @@ Base_image<T> rings(Point q, double d, T this_way, T that_way) {
 
 template<typename T>
 Base_image<T> vertical_stripe(double d, T this_way, T that_way) {
-    auto less_d = lift(std::less<>(), Detail::abs_first, constant(d / 2));
+    auto abs_first = [](const Point p) {
+        return std::abs(Detail::make_cartesian(p).first);
+    };
+    auto less_d = lift(std::less<>(), abs_first, constant(d / 2.0));
 
     return Detail::cond(less_d, constant(this_way), constant(that_way));
 }
